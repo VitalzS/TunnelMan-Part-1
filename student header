@@ -1,0 +1,43 @@
+#ifndef STUDENTWORLD_H_
+#define STUDENTWORLD_H_
+
+#include "GameWorld.h"
+#include "GameConstants.h"
+#include <string>
+#include <vector>
+
+// Students:  Add code to this file, StudentWorld.cpp, Actor.h, and Actor.cpp
+
+class Actor;
+class Earth;
+class TunnelMan;
+
+class StudentWorld : public GameWorld
+{
+public:
+    StudentWorld(std::string assetDir);
+    virtual ~StudentWorld();
+
+    virtual int init();
+    virtual int move();
+    virtual void cleanUp();
+
+    // Access to the player (useful later)
+    TunnelMan* getPlayer() const { return m_player; }
+
+    // Simple Earth query (useful later)
+    bool hasEarthAt(int x, int y) const;
+
+private:
+    TunnelMan* m_player;                            // the player
+    Earth* m_earth[VIEW_WIDTH][VIEW_HEIGHT];    // grid of Earth ptrs
+    std::vector<Actor*> m_actors;                   // for Part 2+ (unused now)
+};
+
+#endif // STUDENTWORLD_H_
+
+
+
+
+
+
