@@ -1,0 +1,153 @@
+#include "StudentWorld.h"
+#include "Actor.h"
+#include <string>
+using namespace std;
+
+// Factory function required by the framework
+GameWorld* createStudentWorld(string assetDir)
+{
+    return new StudentWorld(assetDir);
+}
+
+// Students:  Add code to this file (if you wish), StudentWorld.h, Actor.h and Actor.cpp
+
+// ==============================
+// Ctor / Dtor
+// ==============================
+
+StudentWorld::StudentWorld(string assetDir)
+    : GameWorld(assetDir),
+    m_player(nullptr)
+{
+    // Initialize Earth grid to nullptr
+    for (int x = 0; x < VIEW_WIDTH; x++)
+        for (int y = 0; y < VIEW_HEIGHT; y++)
+            m_earth[x][y] = nullptr;
+}
+
+StudentWorld::~StudentWorld()
+{
+    cleanUp();
+}
+
+// ==============================
+// init
+// ==============================
+
+int StudentWorld::init()
+{
+    // 1. Create the TunnelMan at (30, 60)
+    m_player = new TunnelMan(this);
+
+    // 2. Create the initial field of Earth.
+    //
+    // World coordinates: 0..63 in both x and y.
+    // Requirement:
+    //  - No Earth in the top 4 rows (y = 60..63).
+    //  - Central vertical shaft from x = 30..33 with no Earth for y >= 4.
+    for (int x = 0; x < VIEW_WIDTH; x++)
+    {
+        for (int y = 0; y < VIEW_HEIGHT; y++)
+        {
+            // Clear any existing Earth (should be null on first init).
+            if (m_earth[x][y] != nullptr)
+            {
+                delete m_earth[x][y];
+                m_earth[x][y] = nullptr;
+            }
+
+            // No Earth in top 4 rows
+            if (y >= VIEW_HEIGHT - 4) // y >= 60
+                continue;
+
+            // No Earth in the central shaft (x = 30..33, y >= 4)
+            if (x >= 30 && x <= 33 && y >= 4)
+                continue;
+
+            // Otherwise place Earth at (x,y)
+            m_earth[x][y] = new Earth(x, y, this);
+        }
+    }
+
+    // For Part 1, no other actors are created.
+    return GWSTATUS_CONTINUE_GAME;
+}
+
+// ==============================
+// move (one tick of the game)
+// ==============================
+
+int StudentWorld::move()
+{
+    // 1. Let the player do something this tick.
+    if (m_player != nullptr && m_player->isAlive())
+        m_player->doSomething();
+
+    // 2. Dig up any Earth overlapping TunnelMan’s 4x4 footprint.
+    bool dug = false;
+    if (m_player != nullptr)
+    {
+        int px = m_player->getX();
+        int py = m_player->getY();
+
+        // TunnelMan occupies (px..px+3, py..py+3)
+        for (int x = px; x < px + 4 && x < VIEW_WIDTH; x++)
+        {
+            for (int y = py; y < py + 4 && y < VIEW_HEIGHT; y++)
+            {
+                if (m_earth[x][y] != nullptr)
+                {
+                    delete m_earth[x][y];
+                    m_earth[x][y] = nullptr;
+                    dug = true;
+                }
+            }
+        }
+    }
+
+    // If any Earth was removed this tick, play the digging sound.
+    if (dug)
+        playSound(SOUND_DIG);
+
+    // 3. Check if the player has died this tick.
+    if (m_player == nullptr || !m_player->isAlive())
+    {
+        decLives();
+        return GWSTATUS_PLAYER_DIED;
+    }
+
+    // 4. For Part 1, the level never ends; we just keep going.
+    return GWSTATUS_CONTINUE_GAME;
+}
+
+// ==============================
+// cleanUp
+// ==============================
+
+void StudentWorld::cleanUp()
+{
+    // Delete the player
+    delete m_player;
+    m_player = nullptr;
+
+    // Delete all Earth
+    for (int x = 0; x < VIEW_WIDTH; x++)
+    {
+        for (int y = 0; y < VIEW_HEIGHT; y++)
+        {
+            delete m_earth[x][y];
+            m_earth[x][y] = nullptr;
+        }
+    }
+}
+
+// ==============================
+// Helper
+// ==============================
+
+bool StudentWorld::hasEarthAt(int x, int y) const
+{
+    if (x < 0 || x >= VIEW_WIDTH || y < 0 || y >= VIEW_HEIGHT)
+        return false;
+    return m_earth[x][y] != nullptr;
+}
