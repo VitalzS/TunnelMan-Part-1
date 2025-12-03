@@ -1,0 +1,483 @@
+#include "Actor.h"
+#include "StudentWorld.h"
+#include "GameConstants.h"
+
+// Students:  Add code to this file (if you wish), Actor.h, StudentWorld.h, and StudentWorld.cpp
+
+// ==============================
+// Actor (base)
+// ==============================
+
+Actor::Actor(int imageID, int startX, int startY,
+    Direction dir, double size, unsigned int depth,
+    StudentWorld* world)
+    : GraphObject(imageID, startX, startY, dir, size, depth),
+    m_alive(true),
+    m_world(world)
+{
+    setVisible(true);
+}
+
+bool Actor::isAlive() const
+{
+    return m_alive;
+}
+
+void Actor::setDead()
+{
+    m_alive = false;
+    setVisible(false);
+}
+
+StudentWorld* Actor::getWorld() const
+{
+    return m_world;
+}
+
+// ==============================
+// Earth
+// ==============================
+
+Earth::Earth(int startX, int startY, StudentWorld* world)
+    : Actor(TID_EARTH, startX, startY, right, 0.25, 3, world)
+{
+    // Earth is static and always visible.
+    setVisible(true);
+}
+
+// ==============================
+// TunnelMan (player)
+// ==============================
+
+namespace
+{
+    const int TM_MAX_HEALTH = 10;
+}
+
+TunnelMan::TunnelMan(StudentWorld* world)
+    : Actor(TID_PLAYER, 30, 60, right, 1.0, 0, world),
+    m_health(TM_MAX_HEALTH),
+    m_waterUnits(5),        // starting values (used in Part 2)
+    m_sonarCharges(1),
+    m_goldNuggets(0)
+{
+}
+
+int TunnelMan::getHealth() const
+{
+    return m_health;
+}
+
+void TunnelMan::increaseHealth(int amount)
+{
+    m_health += amount;
+    if (m_health > TM_MAX_HEALTH)
+        m_health = TM_MAX_HEALTH;
+}
+
+void TunnelMan::decreaseHealth(int amount)
+{
+    m_health -= amount;
+    if (m_health < 0)
+        m_health = 0;
+    if (m_health == 0)
+        setDead();
+}
+
+int TunnelMan::getWater() const
+{
+    return m_waterUnits;
+}
+
+int TunnelMan::getSonar() const
+{
+    return m_sonarCharges;
+}
+
+int TunnelMan::getGold() const
+{
+    return m_goldNuggets;
+}
+
+void TunnelMan::addWater(int amount)
+{
+    m_waterUnits += amount;
+}
+
+void TunnelMan::addSonar(int amount)
+{
+    m_sonarCharges += amount;
+}
+
+void TunnelMan::addGold(int amount)
+{
+    m_goldNuggets += amount;
+}
+
+void TunnelMan::annoy(int amount)
+{
+    if (!isAlive())
+        return;
+
+    decreaseHealth(amount);
+
+    // For Part 1, we don't need sounds or extra behavior yet.
+}
+
+void TunnelMan::doSomething()
+{
+    // Part 1: Just handle movement with arrow keys.
+    if (!isAlive())
+        return;
+
+    int ch;
+    if (!getWorld()->getKey(ch))  // no key pressed this tick
+        return;
+
+    int x = getX();
+    int y = getY();
+
+    // Sprites are 4x4; lower-left (x,y) must stay within [0,60].
+    const int MIN_X = 0;
+    const int MIN_Y = 0;
+    const int MAX_X = 60;
+    const int MAX_Y = 60;
+
+    switch (ch)
+    {
+    case KEY_PRESS_LEFT:
+        if (getDirection() != left)
+        {
+            setDirection(left);
+        }
+        else if (x > MIN_X)
+        {
+            moveTo(x - 1, y);
+        }
+        break;
+
+    case KEY_PRESS_RIGHT:
+        if (getDirection() != right)
+        {
+            setDirection(right);
+        }
+        else if (x < MAX_X)
+        {
+            moveTo(x + 1, y);
+        }
+        break;
+
+    case KEY_PRESS_UP:
+        if (getDirection() != up)
+        {
+            setDirection(up);
+        }
+        else if (y < MAX_Y)
+        {
+            moveTo(x, y + 1);
+        }
+        break;
+
+    case KEY_PRESS_DOWN:
+        if (getDirection() != down)
+        {
+            setDirection(down);
+        }
+        else if (y > MIN_Y)
+        {
+            moveTo(x, y - 1);
+        }
+        break;
+
+    default:
+        // For Part 1, all other keys (space, ESC, z, tab, etc.) are ignored.
+        break;
+    }
+
+    // Digging Earth is normally handled in StudentWorld::move()
+    // by checking the player's position and removing any overlapping Earth.
+}
+
+// ==============================
+// Boulder
+// ==============================
+
+Boulder::Boulder(int startX, int startY, StudentWorld* world)
+    : Actor(TID_BOULDER, startX, startY, down, 1.0, 1, world),
+    m_state(stable),
+    m_waitTicks(0)
+{
+}
+
+void Boulder::doSomething()
+{
+    // Not required for Part 1. We'll implement full behavior in Part 2.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// Squirt
+// ==============================
+
+Squirt::Squirt(int startX, int startY, Direction dir, StudentWorld* world)
+    : Actor(TID_WATER_SPURT, startX, startY, dir, 1.0, 1, world),
+    m_travelDistance(4)
+{
+}
+
+void Squirt::doSomething()
+{
+    // Not required for Part 1.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// ActivatingObject (base for goodies)
+// ==============================
+
+ActivatingObject::ActivatingObject(int imageID, int startX, int startY,
+    Direction dir, double size, unsigned int depth,
+    StudentWorld* world,
+    int lifetime,
+    bool activateOnlyOnPlayer,
+    bool initiallyVisible)
+    : Actor(imageID, startX, startY, dir, size, depth, world),
+    m_lifetime(lifetime),
+    m_activateOnlyOnPlayer(activateOnlyOnPlayer)
+{
+    setVisible(initiallyVisible);
+}
+
+int ActivatingObject::getLifetime() const
+{
+    return m_lifetime;
+}
+
+void ActivatingObject::setLifetime(int lifetime)
+{
+    m_lifetime = lifetime;
+}
+
+bool ActivatingObject::activatesOnlyOnPlayer() const
+{
+    return m_activateOnlyOnPlayer;
+}
+
+void ActivatingObject::doSomething()
+{
+    // For Part 1 we don't need goodies to do anything.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// OilBarrel
+// ==============================
+
+OilBarrel::OilBarrel(int startX, int startY, StudentWorld* world)
+    : ActivatingObject(TID_BARREL, startX, startY,
+        right, 1.0, 2, world,
+        -1,       // permanent until picked up
+        true,     // only player can pick up
+        false)    // start hidden
+{
+}
+
+void OilBarrel::doSomething()
+{
+    // Not required for Part 1.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// GoldNugget
+// ==============================
+
+GoldNugget::GoldNugget(int startX, int startY, bool temporary, StudentWorld* world)
+    : ActivatingObject(TID_GOLD, startX, startY,
+        right, 1.0, 2, world,
+        temporary ? 100 : -1,
+        true,
+        temporary),
+    m_temporary(temporary)
+{
+    if (!temporary)
+        setVisible(false);
+}
+
+bool GoldNugget::isTemporary() const
+{
+    return m_temporary;
+}
+
+void GoldNugget::doSomething()
+{
+    // Not required for Part 1.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// SonarKit
+// ==============================
+
+SonarKit::SonarKit(int startX, int startY, StudentWorld* world)
+    : ActivatingObject(TID_SONAR, startX, startY,
+        right, 1.0, 2, world,
+        100,    // default lifetime; will be refined in Part 2
+        true,
+        true)
+{
+}
+
+void SonarKit::doSomething()
+{
+    // Not required for Part 1.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// WaterPool
+// ==============================
+
+WaterPool::WaterPool(int startX, int startY, StudentWorld* world)
+    : ActivatingObject(TID_WATER_POOL, startX, startY,
+        right, 1.0, 2, world,
+        100,
+        true,
+        true)
+{
+}
+
+void WaterPool::doSomething()
+{
+    // Not required for Part 1.
+    if (!isAlive())
+        return;
+}
+
+// ==============================
+// Protester (base + derived)
+// ==============================
+
+Protester::Protester(int imageID, int startX, int startY,
+    StudentWorld* world, int hitPoints)
+    : Actor(imageID, startX, startY, left, 1.0, 0, world),
+    m_health(hitPoints),
+    m_leavingOilField(false),
+    m_restTicks(0),
+    m_ticksUntilYell(0),
+    m_ticksUntilTurn(0),
+    m_squaresToMoveInCurrentDirection(0)
+{
+}
+
+int Protester::getHealth() const
+{
+    return m_health;
+}
+
+void Protester::setHealth(int hp)
+{
+    m_health = hp;
+    if (m_health <= 0)
+    {
+        m_health = 0;
+        setStateLeaving();
+    }
+}
+
+int Protester::getRestTicks() const
+{
+    return m_restTicks;
+}
+
+void Protester::setRestTicks(int ticks)
+{
+    m_restTicks = ticks;
+}
+
+int Protester::getSquaresToMoveInCurrentDirection() const
+{
+    return m_squaresToMoveInCurrentDirection;
+}
+
+void Protester::setSquaresToMoveInCurrentDirection(int n)
+{
+    m_squaresToMoveInCurrentDirection = n;
+}
+
+bool Protester::isLeavingOilField() const
+{
+    return m_leavingOilField;
+}
+
+void Protester::setStateLeaving()
+{
+    m_leavingOilField = true;
+}
+
+void Protester::annoy(int amount)
+{
+    if (!isAlive() || m_leavingOilField)
+        return;
+
+    m_health -= amount;
+    if (m_health <= 0)
+    {
+        m_health = 0;
+        setStateLeaving();
+    }
+}
+
+void Protester::doSomething()
+{
+    // Full AI is Part 2; for Part 1 we can keep this empty.
+    if (!isAlive())
+        return;
+}
+
+// RegularProtester
+
+RegularProtester::RegularProtester(StudentWorld* world)
+    : Protester(TID_PROTESTER, 60, 60, world, 5)
+{
+}
+
+void RegularProtester::doSomething()
+{
+    Protester::doSomething();
+}
+
+// HardCoreProtester
+
+HardCoreProtester::HardCoreProtester(StudentWorld* world)
+    : Protester(TID_HARD_CORE_PROTESTER, 60, 60, world, 20)
+{
+}
+
+void HardCoreProtester::doSomething()
+{
+    Protester::doSomething();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
