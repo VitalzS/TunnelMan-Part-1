@@ -1,0 +1,277 @@
+#ifndef ACTOR_H_
+#define ACTOR_H_
+
+#include "GraphObject.h"
+#include "GameConstants.h"
+
+// Students:  Add code to this file, Actor.cpp, StudentWorld.h, and StudentWorld.cpp
+
+class StudentWorld;
+
+// Convenience alias for the direction type from GraphObject
+using Direction = GraphObject::Direction;
+
+// =============================================================================
+// Base Actor
+// =============================================================================
+
+class Actor : public GraphObject {
+public:
+    Actor(int imageID, int startX, int startY,
+        Direction dir, double size, unsigned int depth,
+        StudentWorld* world);
+    virtual ~Actor() {}
+
+    // Every tick, each live actor gets a chance to do something.
+    virtual void doSomething() = 0;
+
+    // Life cycle
+    bool isAlive() const;
+    void setDead();
+
+    // Access to the StudentWorld
+    StudentWorld* getWorld() const;
+
+    // Common classification hooks. Subclasses override these as needed.
+    virtual bool blocksMovement() const { return false; } // e.g., boulders
+    virtual bool isDamageable() const { return false; } // e.g., TunnelMan, Protesters
+    virtual bool canPickup() const { return false; } // e.g., goodies
+    virtual bool isProtester() const { return false; }
+    virtual bool isTunnelMan() const { return false; }
+    virtual bool isBoulder() const { return false; }
+    virtual bool isSquirt() const { return false; }
+
+    // Called when this actor is "annoyed" (hit by squirt, boulder, etc.).
+    // Default: do nothing.
+    virtual void annoy(int amount) {}
+
+private:
+    bool          m_alive;
+    StudentWorld* m_world;
+};
+
+// =============================================================================
+// Earth
+// =============================================================================
+
+class Earth : public Actor {
+public:
+    Earth(int startX, int startY, StudentWorld* world);
+    virtual ~Earth() {}
+
+    // Earth does nothing each tick; StudentWorld manages digging, etc.
+    virtual void doSomething() {}
+};
+
+// =============================================================================
+// TunnelMan (Player)
+// =============================================================================
+
+class TunnelMan : public Actor {
+public:
+    TunnelMan(StudentWorld* world);
+    virtual ~TunnelMan() {}
+
+    virtual void doSomething();
+    virtual bool isTunnelMan() const override { return true; }
+    virtual bool isDamageable() const override { return true; }
+
+    // Health
+    int  getHealth() const;
+    void increaseHealth(int amount);
+    void decreaseHealth(int amount);
+
+    // Inventory accessors
+    int  getWater() const;
+    int  getSonar() const;
+    int  getGold()  const;
+
+    void addWater(int amount);
+    void addSonar(int amount);
+    void addGold(int amount);
+
+    virtual void annoy(int amount) override;
+
+private:
+    int m_health;
+    int m_waterUnits;
+    int m_sonarCharges;
+    int m_goldNuggets;
+};
+
+// =============================================================================
+// Boulder
+// =============================================================================
+
+class Boulder : public Actor {
+public:
+    Boulder(int startX, int startY, StudentWorld* world);
+    virtual ~Boulder() {}
+
+    virtual void doSomething();
+    virtual bool blocksMovement() const override { return true; }
+    virtual bool isBoulder() const override { return true; }
+
+private:
+    enum State { stable, waiting, falling };
+    State m_state;
+    int   m_waitTicks; // counts ticks while in waiting state
+};
+
+// =============================================================================
+// Squirt (water shot by TunnelMan)
+// =============================================================================
+
+class Squirt : public Actor {
+public:
+    Squirt(int startX, int startY, Direction dir, StudentWorld* world);
+    virtual ~Squirt() {}
+
+    virtual void doSomething();
+    virtual bool isSquirt() const override { return true; }
+
+private:
+    int m_travelDistance; // remaining steps it can move before disappearing
+};
+
+// =============================================================================
+// ActivatingObject base (goodies, sonar, pools, etc.)
+// =============================================================================
+
+class ActivatingObject : public Actor {
+public:
+    ActivatingObject(int imageID, int startX, int startY,
+        Direction dir, double size, unsigned int depth,
+        StudentWorld* world,
+        int lifetime = -1,      // -1 means permanent
+        bool activateOnlyOnPlayer = true,
+        bool initiallyVisible = false);
+    virtual ~ActivatingObject() {}
+
+    virtual void doSomething();
+    virtual bool canPickup() const override { return true; }
+
+protected:
+    int  getLifetime() const;
+    void setLifetime(int lifetime);
+    bool activatesOnlyOnPlayer() const;
+
+private:
+    int  m_lifetime;
+    bool m_activateOnlyOnPlayer;
+};
+
+// =============================================================================
+// OilBarrel
+// =============================================================================
+
+class OilBarrel : public ActivatingObject {
+public:
+    OilBarrel(int startX, int startY, StudentWorld* world);
+    virtual ~OilBarrel() {}
+
+    virtual void doSomething();
+};
+
+// =============================================================================
+// GoldNugget
+// =============================================================================
+
+class GoldNugget : public ActivatingObject {
+public:
+    GoldNugget(int startX, int startY, bool temporary, StudentWorld* world);
+    virtual ~GoldNugget() {}
+
+    virtual void doSomething();
+
+    bool isTemporary() const;
+
+private:
+    bool m_temporary;
+};
+
+// =============================================================================
+// SonarKit
+// =============================================================================
+
+class SonarKit : public ActivatingObject {
+public:
+    SonarKit(int startX, int startY, StudentWorld* world);
+    virtual ~SonarKit() {}
+
+    virtual void doSomething();
+};
+
+// =============================================================================
+// WaterPool
+// =============================================================================
+
+class WaterPool : public ActivatingObject
+{
+public:
+    WaterPool(int startX, int startY, StudentWorld* world);
+    virtual ~WaterPool() {}
+
+    virtual void doSomething();
+};
+
+// =============================================================================
+// Protesters (base + two kinds)
+// =============================================================================
+
+class Protester : public Actor
+{
+public:
+    Protester(int imageID, int startX, int startY,
+        StudentWorld* world, int hitPoints);
+    virtual ~Protester() {}
+
+    virtual void doSomething();
+    virtual bool isProtester() const override { return true; }
+    virtual bool isDamageable() const override { return true; }
+    virtual void annoy(int amount) override;
+
+    bool isLeavingOilField() const;
+
+protected:
+    int  getHealth() const;
+    void setHealth(int hp);
+    void setStateLeaving();
+
+    int  getRestTicks() const;
+    void setRestTicks(int ticks);
+
+    int  getSquaresToMoveInCurrentDirection() const;
+    void setSquaresToMoveInCurrentDirection(int n);
+
+private:
+    int  m_health;
+    bool m_leavingOilField;
+    int  m_restTicks;
+    int  m_ticksUntilYell;
+    int  m_ticksUntilTurn;
+    int  m_squaresToMoveInCurrentDirection;
+};
+
+// Regular Protester
+class RegularProtester : public Protester
+{
+public:
+    RegularProtester(StudentWorld* world);
+    virtual ~RegularProtester() {}
+
+    virtual void doSomething();
+};
+
+// HardCore Protester
+class HardCoreProtester : public Protester
+{
+public:
+    HardCoreProtester(StudentWorld* world);
+    virtual ~HardCoreProtester() {}
+
+    virtual void doSomething();
+};
+
+#endif // ACTOR_H_
+
